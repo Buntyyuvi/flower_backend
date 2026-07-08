@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const fs = require('fs');
 const multer = require('multer');
 const path = require('path');
 const { put } = require('@vercel/blob');
@@ -15,8 +16,28 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Use in-memory multer storage so uploads can be forwarded to Vercel Blob
-const upload = multer({ storage: multer.memoryStorage() });
+const uploadDir = path.join(__dirname, 'uploads');
+let upload;
+
+if (!process.env.VERCEL) {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  upload = multer({
+    storage: multer.diskStorage({
+      destination: uploadDir,
+      filename: (req, file, cb) => {
+        const safeName = file.originalname.replace(/\s+/g, '-');
+        cb(null, `${Date.now()}-${safeName}`);
+      }
+    })
+  });
+
+  app.use('/uploads', express.static(uploadDir));
+} else {
+  upload = multer({ storage: multer.memoryStorage() });
+}
 
 // Connect to MongoDB in a Vercel-friendly way
 let cachedMongo = global.mongoose;
@@ -55,6 +76,23 @@ connectToDatabase()
 mongoose.connection.on('disconnected', () => console.log('MongoDB disconnected'));
 mongoose.connection.on('error', (err) => console.error('MongoDB error (server continuing):', err));
 
+async function handleImageUpload(file) {
+  if (!file) return null;
+
+  if (process.env.VERCEL) {
+    const blobName = `products/${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`;
+    const result = await put(file.buffer, {
+      pathname: blobName,
+      access: 'public',
+      contentType: file.mimetype,
+      allowOverwrite: true
+    });
+    return result.url;
+  }
+
+  return `/uploads/${path.basename(file.path)}`;
+}
+
 // Routes
 app.get('/api/products', async (req, res) => {
   try {
@@ -76,14 +114,7 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
   try {
     let img = req.body.img;
     if (req.file) {
-      const blobName = `products/${Date.now()}-${req.file.originalname.replace(/\s+/g, '-')}`;
-      const result = await put(req.file.buffer, {
-        pathname: blobName,
-        access: 'public',
-        contentType: req.file.mimetype,
-        allowOverwrite: true
-      });
-      img = result.url;
+      img = await handleImageUpload(req.file);
     }
 
     const newProduct = new Product({
@@ -106,14 +137,7 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     const updateData = { ...req.body };
     
     if (req.file) {
-      const blobName = `products/${Date.now()}-${req.file.originalname.replace(/\s+/g, '-')}`;
-      const result = await put(req.file.buffer, {
-        pathname: blobName,
-        access: 'public',
-        contentType: req.file.mimetype,
-        allowOverwrite: true
-      });
-      updateData.img = result.url;
+      updateData.img = await handleImageUpload(req.file);
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(

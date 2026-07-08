@@ -1,0 +1,15 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Uploads and local runtime artifacts
+uploads/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
+const { put } = require('@vercel/blob');
 const bcrypt = require('bcryptjs');
 const Product = require('./models/Product');
 const Order = require('./models/Order');
@@ -15,26 +15,8 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Ensure uploads directory exists
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-}
-
-// Multer storage configuration
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    // Generate unique name
-    cb(null, Date.now() + '-' + file.originalname.replace(/\\s+/g, '-'));
-  }
-});
-const upload = multer({ storage: storage });
-
-// Serve static files from uploads folder and the main public images (so old ones still work if referenced locally)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Use in-memory multer storage so uploads can be forwarded to Vercel Blob
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Connect to MongoDB in a Vercel-friendly way
 let cachedMongo = global.mongoose;
@@ -94,7 +76,14 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
   try {
     let img = req.body.img;
     if (req.file) {
-      img = `http://localhost:5000/uploads/${req.file.filename}`;
+      const blobName = `products/${Date.now()}-${req.file.originalname.replace(/\s+/g, '-')}`;
+      const result = await put(req.file.buffer, {
+        pathname: blobName,
+        access: 'public',
+        contentType: req.file.mimetype,
+        allowOverwrite: true
+      });
+      img = result.url;
     }
 
     const newProduct = new Product({
@@ -117,7 +106,14 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     const updateData = { ...req.body };
     
     if (req.file) {
-      updateData.img = `http://localhost:5000/uploads/${req.file.filename}`;
+      const blobName = `products/${Date.now()}-${req.file.originalname.replace(/\s+/g, '-')}`;
+      const result = await put(req.file.buffer, {
+        pathname: blobName,
+        access: 'public',
+        contentType: req.file.mimetype,
+        allowOverwrite: true
+      });
+      updateData.img = result.url;
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(

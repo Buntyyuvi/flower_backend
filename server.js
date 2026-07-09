@@ -61,11 +61,19 @@ async function connectToDatabase() {
   }
 
   if (!cachedMongo.promise) {
-    const mongoUri = process.env.MONGODB_URI;
+    let mongoUri = process.env.MONGODB_URI;
 
     if (!mongoUri) {
       console.warn('MONGODB_URI is not set. Skipping database connection.');
       return null;
+    }
+
+    // Support base64-encoded URI to avoid Vercel env var issues with special characters
+    if (!mongoUri.startsWith('mongodb')) {
+      try {
+        const decoded = Buffer.from(mongoUri, 'base64').toString();
+        if (decoded.startsWith('mongodb')) mongoUri = decoded;
+      } catch {}
     }
 
     cachedMongo.promise = mongoose.connect(mongoUri, {

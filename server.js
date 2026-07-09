@@ -7,6 +7,8 @@ const multer = require('multer');
 const path = require('path');
 const { put } = require('@vercel/blob');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 const Product = require('./models/Product');
 const Order = require('./models/Order');
 const Admin = require('./models/Admin');
@@ -15,6 +17,7 @@ const { sendOrderNotification } = require('./services/telegram');
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+app.use(cookieParser());
 
 const uploadDir = path.join(__dirname, 'uploads');
 let upload;
@@ -109,8 +112,8 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// Create product (with optional image upload)
-app.post('/api/products', upload.single('image'), async (req, res) => {
+// Create product (with optional image upload) - admin only
+app.post('/api/products', verifyAdmin, upload.single('image'), async (req, res) => {
   try {
     let img = req.body.img;
     if (req.file) {
@@ -131,8 +134,8 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
   }
 });
 
-// Update product
-app.put('/api/products/:id', upload.single('image'), async (req, res) => {
+// Update product - admin only
+app.put('/api/products/:id', verifyAdmin, upload.single('image'), async (req, res) => {
   try {
     const updateData = { ...req.body };
     
@@ -155,8 +158,8 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
   }
 });
 
-// Delete product
-app.delete('/api/products/:id', async (req, res) => {
+// Delete product - admin only
+app.delete('/api/products/:id', verifyAdmin, async (req, res) => {
   try {
     await Product.findByIdAndDelete(req.params.id);
     res.json({ message: 'Product deleted' });
@@ -165,8 +168,8 @@ app.delete('/api/products/:id', async (req, res) => {
   }
 });
 
-// Delete order
-app.delete('/api/orders/:id', async (req, res) => {
+// Delete order - admin only
+app.delete('/api/orders/:id', verifyAdmin, async (req, res) => {
   try {
     await Order.findByIdAndDelete(req.params.id);
     res.json({ message: 'Order deleted' });
@@ -175,8 +178,8 @@ app.delete('/api/orders/:id', async (req, res) => {
   }
 });
 
-// Get all orders
-app.get('/api/orders', async (req, res) => {
+// Get all orders - admin only
+app.get('/api/orders', verifyAdmin, async (req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 });
     const formatted = orders.map(o => {
@@ -214,11 +217,51 @@ app.post('/api/admin/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, admin.password);
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
 
+    const secret = process.env.JWT_SECRET || 'please_change_this_secret';
+    const token = jwt.sign({ id: admin._id, role: 'admin' }, secret, { expiresIn: '24h' });
+
+    // Set token as an HTTP-only cookie that expires in 24 hours
+    res.cookie('token', token, {
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+      secure: process.env.VERCEL ? true : false,
+    });
+
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Admin logout
+app.post('/api/admin/logout', (req, res) => {
+  res.clearCookie('token');
+  res.json({ success: true });
+});
+
+// Auth middleware for admin-protected routes
+function verifyAdmin(req, res, next) {
+  try {
+    const secret = process.env.JWT_SECRET || 'please_change_this_secret';
+
+    let token = null;
+    if (req.cookies && req.cookies.token) token = req.cookies.token;
+    if (!token && req.headers && req.headers.authorization) {
+      const parts = req.headers.authorization.split(' ');
+      if (parts.length === 2 && parts[0] === 'Bearer') token = parts[1];
+    }
+
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+    const payload = jwt.verify(token, secret);
+    // Optional: attach admin id to req for downstream handlers
+    req.adminId = payload.id;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+}
 
 // Global error handling middleware
 app.use((err, req, res, next) => {

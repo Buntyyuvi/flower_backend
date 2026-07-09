@@ -20,5 +20,8 @@
     "express": "^5.2.1",
     "mongoose": "^9.7.4",
     "multer": "^2.2.0"
+    ,
+    "cookie-parser": "^1.4.6",
+    "jsonwebtoken": "^9.0.0"
   }
 }

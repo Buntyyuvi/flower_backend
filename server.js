@@ -14,6 +14,15 @@ const Order = require('./models/Order');
 const Admin = require('./models/Admin');
 const { sendOrderNotification } = require('./services/telegram');
 
+console.log('=== ENV CHECK ===');
+console.log('VERCEL:', process.env.VERCEL);
+console.log('MONGODB_URI exists:', !!process.env.MONGODB_URI);
+console.log('MONGODB_URI prefix:', process.env.MONGODB_URI ? process.env.MONGODB_URI.substring(0, 20) + '...' : 'NOT SET');
+console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
+console.log('FRONTEND_ORIGIN:', process.env.FRONTEND_ORIGIN);
+console.log('PORT:', process.env.PORT);
+console.log('=================');
+
 const app = express();
 app.use(cors({
   origin: process.env.FRONTEND_ORIGIN || true,

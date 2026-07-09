@@ -147,7 +147,7 @@ app.get('/api/products', async (req, res) => {
 });
 
 // Create product (with optional image upload) - admin only
-app.post('/api/products', async (req, res) => {
+app.post('/api/products', verifyAdmin, async (req, res) => {
   try {
     await connectToDatabase();
     const img = await handleBase64Image(req.body.img);
@@ -167,7 +167,7 @@ app.post('/api/products', async (req, res) => {
 });
 
 // Update product - admin only
-app.put('/api/products/:id', async (req, res) => {
+app.put('/api/products/:id', verifyAdmin, async (req, res) => {
   try {
     await connectToDatabase();
     const updateData = { ...req.body };
@@ -189,7 +189,7 @@ app.put('/api/products/:id', async (req, res) => {
 });
 
 // Delete product - admin only
-app.delete('/api/products/:id', async (req, res) => {
+app.delete('/api/products/:id', verifyAdmin, async (req, res) => {
   try {
     await connectToDatabase();
     await Product.findByIdAndDelete(req.params.id);
@@ -200,7 +200,7 @@ app.delete('/api/products/:id', async (req, res) => {
 });
 
 // Delete order - admin only
-app.delete('/api/orders/:id', async (req, res) => {
+app.delete('/api/orders/:id', verifyAdmin, async (req, res) => {
   try {
     await connectToDatabase();
     await Order.findByIdAndDelete(req.params.id);
@@ -211,7 +211,7 @@ app.delete('/api/orders/:id', async (req, res) => {
 });
 
 // Get all orders - admin only
-app.get('/api/orders', async (req, res) => {
+app.get('/api/orders', verifyAdmin, async (req, res) => {
   try {
     await connectToDatabase();
     const orders = await Order.find().sort({ createdAt: -1 });

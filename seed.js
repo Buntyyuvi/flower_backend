@@ -107,7 +107,7 @@ const seedAdmin = async () => {
     console.log('Admin user already exists, skipping...');
     return;
   }
-  const hashedPassword = await bcrypt.hash('1PBt@UiZ293j', 10);
+  const hashedPassword = await bcrypt.hash('Payalmohite@2222', 10);
   await Admin.create({ username: 'payalsanapMohite', password: hashedPassword });
   console.log('Admin user created.');
 };

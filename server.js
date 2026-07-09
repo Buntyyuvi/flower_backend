@@ -105,6 +105,7 @@ async function handleImageUpload(file) {
 // Routes
 app.get('/api/products', async (req, res) => {
   try {
+    await connectToDatabase();
     const products = await Product.find().sort({ createdAt: 1 });
     // Convert _id to id to match frontend expectation
     const formatted = products.map(p => {
@@ -121,6 +122,7 @@ app.get('/api/products', async (req, res) => {
 // Create product (with optional image upload) - admin only
 app.post('/api/products', verifyAdmin, upload.single('image'), async (req, res) => {
   try {
+    await connectToDatabase();
     let img = req.body.img;
     if (req.file) {
       img = await handleImageUpload(req.file);
@@ -143,6 +145,7 @@ app.post('/api/products', verifyAdmin, upload.single('image'), async (req, res) 
 // Update product - admin only
 app.put('/api/products/:id', verifyAdmin, upload.single('image'), async (req, res) => {
   try {
+    await connectToDatabase();
     const updateData = { ...req.body };
     
     if (req.file) {
@@ -167,6 +170,7 @@ app.put('/api/products/:id', verifyAdmin, upload.single('image'), async (req, re
 // Delete product - admin only
 app.delete('/api/products/:id', verifyAdmin, async (req, res) => {
   try {
+    await connectToDatabase();
     await Product.findByIdAndDelete(req.params.id);
     res.json({ message: 'Product deleted' });
   } catch (error) {
@@ -177,6 +181,7 @@ app.delete('/api/products/:id', verifyAdmin, async (req, res) => {
 // Delete order - admin only
 app.delete('/api/orders/:id', verifyAdmin, async (req, res) => {
   try {
+    await connectToDatabase();
     await Order.findByIdAndDelete(req.params.id);
     res.json({ message: 'Order deleted' });
   } catch (error) {
@@ -187,6 +192,7 @@ app.delete('/api/orders/:id', verifyAdmin, async (req, res) => {
 // Get all orders - admin only
 app.get('/api/orders', verifyAdmin, async (req, res) => {
   try {
+    await connectToDatabase();
     const orders = await Order.find().sort({ createdAt: -1 });
     const formatted = orders.map(o => {
       const obj = o.toObject();
@@ -202,6 +208,7 @@ app.get('/api/orders', verifyAdmin, async (req, res) => {
 // Create order
 app.post('/api/orders', async (req, res) => {
   try {
+    await connectToDatabase();
     const newOrder = new Order(req.body);
     await newOrder.save();
     sendOrderNotification(req.body);
@@ -216,6 +223,7 @@ app.post('/api/orders', async (req, res) => {
 // Admin login
 app.post('/api/admin/login', async (req, res) => {
   try {
+    await connectToDatabase();
     const { username, password } = req.body;
     const admin = await Admin.findOne({ username });
     if (!admin) return res.status(401).json({ error: 'Invalid credentials' });

@@ -125,9 +125,10 @@ async function handleImageUpload(file) {
 }
 
 async function handleBase64Image(dataUrl) {
-  if (!dataUrl || !dataUrl.startsWith('data:image/')) return dataUrl;
+  if (!dataUrl || typeof dataUrl !== 'string') return dataUrl;
+  if (!dataUrl.startsWith('data:')) return dataUrl;
 
-  const matches = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+  const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return dataUrl;
 
   const contentType = matches[1];

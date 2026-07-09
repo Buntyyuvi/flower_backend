@@ -102,6 +102,33 @@ async function handleImageUpload(file) {
   return `/uploads/${path.basename(file.path)}`;
 }
 
+async function handleBase64Image(dataUrl) {
+  if (!dataUrl || !dataUrl.startsWith('data:image/')) return dataUrl;
+
+  const matches = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+  if (!matches) return dataUrl;
+
+  const contentType = matches[1];
+  const buffer = Buffer.from(matches[2], 'base64');
+
+  if (process.env.VERCEL) {
+    const ext = contentType.split('/')[1];
+    const blobName = `products/${Date.now()}.${ext}`;
+    const result = await put(blobName, buffer, {
+      access: 'public',
+      contentType,
+      addRandomSuffix: true
+    });
+    return result.url;
+  }
+
+  const ext = contentType.split('/')[1];
+  const filename = `${Date.now()}.${ext}`;
+  const filepath = path.join(uploadDir, filename);
+  fs.writeFileSync(filepath, buffer);
+  return `/uploads/${filename}`;
+}
+
 // Routes
 app.get('/api/products', async (req, res) => {
   try {
@@ -120,13 +147,10 @@ app.get('/api/products', async (req, res) => {
 });
 
 // Create product (with optional image upload) - admin only
-app.post('/api/products', verifyAdmin, upload.single('image'), async (req, res) => {
+app.post('/api/products', verifyAdmin, async (req, res) => {
   try {
     await connectToDatabase();
-    let img = req.body.img;
-    if (req.file) {
-      img = await handleImageUpload(req.file);
-    }
+    const img = await handleBase64Image(req.body.img);
 
     const newProduct = new Product({
       ...req.body,
@@ -143,14 +167,11 @@ app.post('/api/products', verifyAdmin, upload.single('image'), async (req, res) 
 });
 
 // Update product - admin only
-app.put('/api/products/:id', verifyAdmin, upload.single('image'), async (req, res) => {
+app.put('/api/products/:id', verifyAdmin, async (req, res) => {
   try {
     await connectToDatabase();
     const updateData = { ...req.body };
-    
-    if (req.file) {
-      updateData.img = await handleImageUpload(req.file);
-    }
+    updateData.img = await handleBase64Image(updateData.img);
 
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id, 

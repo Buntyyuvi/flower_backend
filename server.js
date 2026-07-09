@@ -15,8 +15,14 @@ const Admin = require('./models/Admin');
 const { sendOrderNotification } = require('./services/telegram');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_ORIGIN || true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 const uploadDir = path.join(__dirname, 'uploads');
@@ -224,11 +230,12 @@ app.post('/api/admin/login', async (req, res) => {
     res.cookie('token', token, {
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000,
-      sameSite: 'lax',
+      sameSite: process.env.VERCEL ? 'none' : 'lax',
       secure: process.env.VERCEL ? true : false,
     });
 
-    res.json({ success: true });
+    // Also return the token in JSON for frontend auth flows that send Authorization headers
+    res.json({ success: true, token });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

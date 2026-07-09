@@ -88,11 +88,16 @@ async function connectToDatabase() {
     cachedMongo.promise = mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 5000,
       maxPoolSize: 10
-    }).then((mongooseInstance) => mongooseInstance);
+    }).then((mongooseInstance) => {
+      cachedMongo.conn = mongooseInstance;
+      return mongooseInstance;
+    }).catch(err => {
+      cachedMongo.promise = null;
+      throw err;
+    });
   }
 
-  cachedMongo.conn = await cachedMongo.promise;
-  return cachedMongo.conn;
+  return cachedMongo.promise;
 }
 
 connectToDatabase()
